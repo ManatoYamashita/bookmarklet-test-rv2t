@@ -6,9 +6,10 @@ const path = require('path');
 /**
  * JavaScriptコードをMinifyして一行にする関数
  * - コメント（単一行、複数行）を削除
- * - 改行を削除
+ * - 改行を削除（ただし、特定の場所ではスペースに置換）
  * - 不要な連続する空白を単一の空白に置き換え
  * - 前後の空白をトリム
+ * - 必要に応じてセミコロンを挿入
  * @param {string} code - Minifyする元のJavaScriptコード
  * @returns {string} Minifyされた一行のJavaScriptコード
  */
@@ -20,15 +21,26 @@ function minifyJavaScript(code) {
   // ただし、文字列リテラル内の // は削除しないように注意
   code = code.replace(/(?<!["'`])\/\/.*$/gm, '');
 
-  // 3. 改行とタブを削除
-  code = code.replace(/[\n\t]/g, '');
+  // 3. 改行をスペースに置換（改行が構文的に意味を持つ場合に備えて）
+  // ただし、セミコロンで終わる行の後の改行は完全に削除してOK
+  code = code.replace(/;\s*\n/g, ';'); // セミコロンの後の改行は削除
+  code = code.replace(/\n/g, ' '); // それ以外の改行はスペースに置換
 
   // 4. 不要な連続する空白を単一の空白に置き換え
-  // セミコロンやカンマの前後の空白は特に重要でないため、削除しても問題ないことが多い
   code = code.replace(/\s{2,}/g, ' ');
 
-  // 5. コードの前後の空白をトリム
+  // 5. 特定の構文の前後で安全のためにスペースを挿入
+  // 例: `}`の後に続く`(function()`のような場合
+  code = code.replace(/\}\(/g, '} (');
+  code = code.replace(/\)\(/g, ') (');
+
+  // 6. コードの前後の空白をトリム
   code = code.trim();
+
+  // 7. 最後のセミコロンが欠落している可能性を考慮して、末尾に強制的に追加
+  if (!code.endsWith(';')) {
+      code += ';';
+  }
 
   return code;
 }
