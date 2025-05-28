@@ -40,5 +40,6 @@ node minify.js code.js
 - `index.hsml`: Bookmarkletのテスト用のHTMLファイルです。ブラウザで開いて、Bookmarkletを実行できます。
 - `code.js`: BookmarkletのJavaScriptコードです。これをminify.jsで圧縮して、Bookmarkletとして使用します。
 - `minify.js`: code.jsを圧縮するためのスクリプトです。Node.jsを使用して実行します。
+- `test.js`: Bookmarkletのテスト用のJavaScriptコードです。Bookmarkletが正しく動作するかを確認するために使用します。（Safari/iOS, Safari/macでは動くことを確認）
 - `bookmarklet.js`: minify.jsによってcode.jsを圧縮し、生成されたBookmarkletコードです。
 - `README.md`: このドキュメントファイルです。Bookmarkletの使用方法や作成方法について説明しています。
