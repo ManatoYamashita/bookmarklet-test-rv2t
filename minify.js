@@ -62,13 +62,18 @@ const outputFilePath = path.resolve(process.cwd(), outputFileName);
 
 try {
   // ファイルの内容を同期的に読み込む
-  const originalCode = fs.readFileSync(inputFilePath, 'utf8');
+  let originalCode = fs.readFileSync(inputFilePath, 'utf8');
+
+  // `javascript:` プレフィックスが既に存在する場合は削除
+  // これはcode.js自体が `javascript:` で始まることを考慮するため
+  originalCode = originalCode.replace(/^javascript:\s*/, '');
 
   // JavaScriptコードをMinify
   const minifiedCode = minifyJavaScript(originalCode);
 
   // Minifyされたコードを bookmarklet.js に書き込む
   // `javascript:` プレフィックスを付けて書き込むことで、そのままブックマークレットとして使える形式にする
+  // ここで初めて `javascript:` を追加する
   fs.writeFileSync(outputFilePath, `javascript:${minifiedCode}`, 'utf8');
 
   console.log(`✅ ${inputFileName} をMinifyし、${outputFileName} に出力しました。`);
