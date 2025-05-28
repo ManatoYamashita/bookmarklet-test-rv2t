@@ -6,59 +6,65 @@ const path = require('path');
 /**
  * JavaScriptコードをMinifyして一行にする関数
  * - コメント（複数行、単一行）を削除
+ * - 文字列リテラル（ダブルクォート、シングルクォート、バックティック）を保護
  * - 改行を削除
- * - 不要な連続する空白を単一の空白に置き換え
- * - 前後の空白をトリム
+ * - あらゆる種類の空白を単一スペースに統一
+ * - 前後の空白をトリム（あらゆる種類の空白を対象）
  * - 必要に応じてセミコロンやスペースを挿入
  * @param {string} code - Minifyする元のJavaScriptコード
  * @returns {string} Minifyされた一行のJavaScriptコード
  */
 function minifyJavaScript(code) {
-  // 1. 複数行コメント /* ... */ を削除
+  const stringLiterals = [];
+  let stringCounter = 0;
+
+  // Step 1: 文字列リテラルとテンプレートリテラルを一時的なプレースホルダーに置き換える
+  // これは、正規表現による処理で文字列内部が破損するのを防ぐためです。
+  code = code.replace(/("(?:[^"\\]|\\.)*")|('(?:[^'\\]|\\.)*')|(`(?:[^`\\]|\\.)*`)/g, (match, p1, p2, p3) => {
+    const placeholder = `__JS_STRING_${stringCounter++}__`;
+    stringLiterals.push({ placeholder: placeholder, original: match });
+    return placeholder;
+  });
+
+  // 2. 複数行コメント /* ... */ を削除
   code = code.replace(/\/\*[\s\S]*?\*\//g, '');
 
-  // 2. 特定の末尾コメント行を削除 (code.jsファイル固有の対応。必要に応じて調整)
+  // 3. 特定の末尾コメント行を削除 (code.jsファイル固有の対応)
   code = code.replace(/^\s*\/\/minifiered.*$/gm, '');
   code = code.replace(/^\s*\/\/ javascript:.*$/gm, '');
 
-  // 3. 単一行コメント // を削除 (より包括的な方法)
+  // 4. 単一行コメント // を削除 (より包括的な方法)
   //    行頭のスペースや、コードの途中にある // コメントも削除します。
-  //    ただし、文字列リテラル内の // は保護されます。
-  //    この正規表現は、単一行コメントを安全に削除するために、より複雑なパターンを使用します。
-  //    これは、文字列リテラルをまず「一時的なプレースホルダー」に置き換え、コメント削除後に元に戻す方法の簡易版です。
-  //    よりロバストな方法として、コメントと文字列を同時にマッチングし、コメントだけを削除します。
-  //    ここでは、文字列リテラルとコメントを非キャプチャグループでマッチさせ、コメント部分だけを空文字に置き換えます。
-  //    これにより、`https://` のようなURL内の `//` は保護されます。
-  code = code.replace(/("(?:[^"\\]|\\.)*")|('(?:[^'\\]|\\.)*')|(`(?:[^`\\]|\\.)*`)|(\/\/.*$)/gm, (match, p1, p2, p3, p4) => {
-    if (p1 || p2 || p3) { // 文字列リテラルの場合、そのまま残す
-      return match;
-    }
-    return ''; // コメントの場合、削除する
-  });
+  code = code.replace(/^\s*\/\/.*$/gm, '');
 
-  // 4. すべての改行を単一スペースに置換
-  code = code.replace(/\n/g, ' ');
+  // 5. すべての空白文字 (スペース、タブ、改行、Unicodeの各種空白など) を単一スペースに置換 (NEW)
+  //    これにより、あらゆる種類の空白が正規化されます。
+  code = code.replace(/\s+/g, ' ');
 
-  // 5. セミコロンの直後にスペースがない場合、スペースを挿入
+  // 6. セミコロンの直後にスペースがない場合、スペースを挿入
   code = code.replace(/;(\S)/g, '; $1');
 
-  // 6. `{` `}` `(` `)` `[` `]` の直後にスペースがない場合、スペースを挿入
+  // 7. `{` `}` `(` `)` `[` `]` の直後にスペースがない場合、スペースを挿入
   code = code.replace(/\}\(/g, '} (');
   code = code.replace(/\)\(/g, ') (');
-
-  // 7. 連続する空白を単一の空白に置き換え
-  code = code.replace(/\s{2,}/g, ' ');
 
   // 8. `var`, `function`, `return` などのキーワードの直前にスペースを挿入
   code = code.replace(/([^\s;])(var|function|return|if|for|while|do|switch|try|catch|finally|throw|new)/g, '$1 $2');
 
-  // 9. コードの前後の空白をトリム
-  code = code.trim();
+  // 9. コードの前後のあらゆる種類の空白をトリム (NEW)
+  //    `trim()` よりも強力に、改行や非標準の空白文字も除去します。
+  code = code.replace(/^\s+|\s+$/g, '');
 
   // 10. 最後のセミコロンが欠落している可能性を考慮して、末尾に強制的に追加
   if (!code.endsWith(';')) {
       code += ';';
   }
+
+  // Step 11: プレースホルダーを元の文字列リテラルに戻す
+  stringLiterals.forEach(item => {
+    const regex = new RegExp(item.placeholder.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g');
+    code = code.replace(regex, item.original);
+  });
 
   return code;
 }

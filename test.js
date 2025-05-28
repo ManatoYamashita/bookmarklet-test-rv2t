@@ -5,4 +5,7 @@ javascript:(function() {
     // 現在のページのタイトルとURLをコンソールに表示
     console.log('Page Title:', document.title);
     console.log('Page URL:', window.location.href);
+
+    // 指定のURLにリダイレクト
+    window.location.href = 'https://manapuraza.com';
 })();
