@@ -5,8 +5,8 @@ const path = require('path');
 
 /**
  * JavaScriptコードをMinifyして一行にする関数
- * - コメント（複数行のみ）を削除
- * - 改行を削除（ただし、特定の場所ではスペースに置換）
+ * - コメント（複数行、単一行）を削除
+ * - 改行を削除
  * - 不要な連続する空白を単一の空白に置き換え
  * - 前後の空白をトリム
  * - 必要に応じてセミコロンやスペースを挿入
@@ -17,30 +17,45 @@ function minifyJavaScript(code) {
   // 1. 複数行コメント /* ... */ を削除
   code = code.replace(/\/\*[\s\S]*?\*\//g, '');
 
-  // 2. 単一行コメント // ... を削除 (この行をコメントアウト/削除)
-  // code = code.replace(/(?<!["'`])\/\/.*$/gm, ''); // Safariでの誤作動の原因の可能性あり
+  // 2. 特定の末尾コメント行を削除 (code.jsファイル固有の対応。必要に応じて調整)
+  code = code.replace(/^\s*\/\/minifiered.*$/gm, '');
+  code = code.replace(/^\s*\/\/ javascript:.*$/gm, '');
 
-  // 3. すべての改行を単一スペースに置換
+  // 3. 単一行コメント // を削除 (より包括的な方法)
+  //    行頭のスペースや、コードの途中にある // コメントも削除します。
+  //    ただし、文字列リテラル内の // は保護されます。
+  //    この正規表現は、単一行コメントを安全に削除するために、より複雑なパターンを使用します。
+  //    これは、文字列リテラルをまず「一時的なプレースホルダー」に置き換え、コメント削除後に元に戻す方法の簡易版です。
+  //    よりロバストな方法として、コメントと文字列を同時にマッチングし、コメントだけを削除します。
+  //    ここでは、文字列リテラルとコメントを非キャプチャグループでマッチさせ、コメント部分だけを空文字に置き換えます。
+  //    これにより、`https://` のようなURL内の `//` は保護されます。
+  code = code.replace(/("(?:[^"\\]|\\.)*")|('(?:[^'\\]|\\.)*')|(`(?:[^`\\]|\\.)*`)|(\/\/.*$)/gm, (match, p1, p2, p3, p4) => {
+    if (p1 || p2 || p3) { // 文字列リテラルの場合、そのまま残す
+      return match;
+    }
+    return ''; // コメントの場合、削除する
+  });
+
+  // 4. すべての改行を単一スペースに置換
   code = code.replace(/\n/g, ' ');
 
-  // 4. セミコロンの直後にスペースがない場合、スペースを挿入
-  //    例: `foo();bar` => `foo(); bar`
+  // 5. セミコロンの直後にスペースがない場合、スペースを挿入
   code = code.replace(/;(\S)/g, '; $1');
 
-  // 5. `{` `}` `(` `)` `[` `]` の直後にスペースがない場合、スペースを挿入
-  code = code.replace(/\}\(/g, '} ('); // `}`の後の`(`
-  code = code.replace(/\)\(/g, ') ('); // `)`の後の`(`
+  // 6. `{` `}` `(` `)` `[` `]` の直後にスペースがない場合、スペースを挿入
+  code = code.replace(/\}\(/g, '} (');
+  code = code.replace(/\)\(/g, ') (');
 
-  // 6. 連続する空白を単一の空白に置き換え
+  // 7. 連続する空白を単一の空白に置き換え
   code = code.replace(/\s{2,}/g, ' ');
 
-  // 7. `var`, `function`, `return` などのキーワードの直前にスペースを挿入
+  // 8. `var`, `function`, `return` などのキーワードの直前にスペースを挿入
   code = code.replace(/([^\s;])(var|function|return|if|for|while|do|switch|try|catch|finally|throw|new)/g, '$1 $2');
 
-  // 8. コードの前後の空白をトリム
-  code = code.replace(/^\s+|\s+$/g, ''); // .trim()の代わりに明示的に
+  // 9. コードの前後の空白をトリム
+  code = code.trim();
 
-  // 9. 最後のセミコロンが欠落している可能性を考慮して、末尾に強制的に追加
+  // 10. 最後のセミコロンが欠落している可能性を考慮して、末尾に強制的に追加
   if (!code.endsWith(';')) {
       code += ';';
   }
@@ -77,7 +92,7 @@ try {
   // `javascript:` プレフィックスを付けて書き込む
   fs.writeFileSync(outputFilePath, `javascript:${minifiedCode}`, 'utf8');
 
-  console.log(`✅ <span class="math-inline">\{inputFileName\} をMinifyし、</span>{outputFileName} に出力しました。`);
+  console.log(`✅ ${inputFileName} をMinifyし、${outputFileName} に出力しました。`);
   console.log(`出力パス: ${outputFilePath}`);
 
 } catch (error) {
